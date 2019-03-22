@@ -51,6 +51,11 @@ func (t *HttpClass) Get(url string, header map[string]string) (*HttpClassRet, er
 //httpClass.Post
 func (t *HttpClass) Post(url string, body string, header map[string]string) (*HttpClassRet, error) {
 	req, _ := http.NewRequest("POST", url, strings.NewReader(body))
+
+	if header["content-type"] == "" {
+		header["content-type"] = "application/x-www-form-urlencoded; charset=UTF-8"
+	}
+
 	for h_key, h_var := range header {
 		req.Header.Set(h_key, h_var)
 	}
@@ -77,7 +82,7 @@ func (t *HttpClass) Post(url string, body string, header map[string]string) (*Ht
 	return &HttpClassRet{string(ret), session_str}, nil
 }
 
-//合并2个Cookie
+//Combine Cookie
 func (*HttpClass) AddCookie(old string, new string) string {
 	cookie := map[string]string{}
 	old_arr := strings.Split(old, ";")
