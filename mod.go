@@ -3,12 +3,28 @@ package mod
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func NewHttp() *HttpClass {
 	return &HttpClass{}
+}
+
+func NewTime() *TimeClass {
+	return &TimeClass{}
+}
+func NewStrings() *StringsClass {
+	return &StringsClass{}
+}
+
+type TimeClass struct {
+}
+
+type StringsClass struct {
 }
 
 type HttpClass struct {
@@ -18,6 +34,29 @@ type HttpClass struct {
 type HttpClassRet struct {
 	Body   string
 	Cookie string
+}
+
+func (*TimeClass) Random() string {
+	rand.Seed(time.Now().UnixNano())
+	return strconv.FormatFloat(rand.Float64(), 'f', 16, 64)
+}
+
+func (*StringsClass) BetweenStr(str, start, end string) string {
+	n := strings.Index(str, start)
+	if n == -1 {
+		n = 0
+	}
+	str = string([]byte(str)[n:])
+	m := strings.Index(str, end)
+	if m == -1 {
+		m = len(str)
+	}
+	s := len(start)
+	if s > m {
+		s = m
+	}
+	str = string([]byte(str)[s:m])
+	return str
 }
 
 //httpClass.Get
@@ -82,7 +121,7 @@ func (t *HttpClass) Post(url string, body string, header map[string]string) (*Ht
 	return &HttpClassRet{string(ret), session_str}, nil
 }
 
-//Combine Cookie
+//合并2个Cookie
 func (*HttpClass) AddCookie(old string, new string) string {
 	cookie := map[string]string{}
 	old_arr := strings.Split(old, ";")
