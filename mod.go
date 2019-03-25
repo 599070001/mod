@@ -39,11 +39,13 @@ type HttpClassRet struct {
 	Cookie string
 }
 
+//获取随机16位小数 Math.random
 func (*TimeClass) Random() string {
 	rand.Seed(time.Now().UnixNano())
 	return strconv.FormatFloat(rand.Float64(), 'f', 16, 64)
 }
 
+//截取中间字符串
 func (*StringsClass) BetweenStr(str, start, end string) string {
 	n := strings.Index(str, start)
 	if n == -1 {
@@ -65,6 +67,7 @@ func (*StringsClass) BetweenStr(str, start, end string) string {
 //httpClass.Get
 func (t *HttpClass) Get(url string, header map[string]string) (*HttpClassRet, error) {
 	req, _ := http.NewRequest("GET", url, nil)
+	header = t.initHeader(header)
 	for h_key, h_var := range header {
 		req.Header.Set(h_key, h_var)
 	}
@@ -93,11 +96,7 @@ func (t *HttpClass) Get(url string, header map[string]string) (*HttpClassRet, er
 //httpClass.Post
 func (t *HttpClass) Post(url string, body string, header map[string]string) (*HttpClassRet, error) {
 	req, _ := http.NewRequest("POST", url, strings.NewReader(body))
-
-	if header["content-type"] == "" {
-		header["content-type"] = "application/x-www-form-urlencoded; charset=UTF-8"
-	}
-
+	header = t.initHeader(header)
 	for h_key, h_var := range header {
 		req.Header.Set(h_key, h_var)
 	}
@@ -122,6 +121,18 @@ func (t *HttpClass) Post(url string, body string, header map[string]string) (*Ht
 
 	ret, _ := ioutil.ReadAll(resp.Body)
 	return &HttpClassRet{string(ret), session_str}, nil
+}
+
+//初始化http请求header
+func (*HttpClass) initHeader(header map[string]string) map[string]string {
+	if header["content-type"] == "" {
+		header["content-type"] = "application/x-www-form-urlencoded; charset=UTF-8"
+	}
+
+	if header["user-agent"] == "" {
+		header["user-agent"] = "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) AppleWebKit/534.16 (KHTML, like Gecko) Chrome/10.0.648.133 Safari/534.16"
+	}
+	return header
 }
 
 //httpClass.AddCookie 合并2个Cookie
