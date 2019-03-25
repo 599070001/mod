@@ -21,12 +21,15 @@ func NewStrings() *StringsClass {
 	return &StringsClass{}
 }
 
+//时间类
 type TimeClass struct {
 }
 
+//字符串处理类
 type StringsClass struct {
 }
 
+//http处理类
 type HttpClass struct {
 	HttpClient http.Client
 }
@@ -121,7 +124,7 @@ func (t *HttpClass) Post(url string, body string, header map[string]string) (*Ht
 	return &HttpClassRet{string(ret), session_str}, nil
 }
 
-//合并2个Cookie
+//httpClass.AddCookie 合并2个Cookie
 func (*HttpClass) AddCookie(old string, new string) string {
 	cookie := map[string]string{}
 	old_arr := strings.Split(old, ";")
