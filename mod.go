@@ -39,10 +39,35 @@ type HttpClassRet struct {
 	Cookie string
 }
 
+type TimerRet struct {
+	StopCannel chan interface{}
+}
+
 //获取随机16位小数 Math.random
 func (*TimeClass) Random() string {
 	rand.Seed(time.Now().UnixNano())
 	return strconv.FormatFloat(rand.Float64(), 'f', 16, 64)
+}
+
+//定时器
+func (*TimeClass) Timer(t time.Duration, f func()) *TimerRet {
+	timerRun := time.NewTicker(t)
+	closeChannel := make(chan interface{}, 0)
+	go timerF(timerRun, closeChannel, f)
+	return &TimerRet{closeChannel}
+}
+
+//定时器body
+func timerF(t *time.Ticker, closeChannel chan interface{}, f func()) {
+	for {
+		select {
+		case <-t.C:
+			f()
+		case <-closeChannel:
+			t.Stop()
+			return
+		}
+	}
 }
 
 //截取中间字符串
@@ -67,7 +92,7 @@ func (*StringsClass) BetweenStr(str, start, end string) string {
 //httpClass.Get
 func (t *HttpClass) Get(url string, header map[string]string) (*HttpClassRet, error) {
 	req, _ := http.NewRequest("GET", url, nil)
-	header = t.initHeader(header)
+	header = t.initHttpRequst(header)
 	for h_key, h_var := range header {
 		req.Header.Set(h_key, h_var)
 	}
@@ -96,10 +121,11 @@ func (t *HttpClass) Get(url string, header map[string]string) (*HttpClassRet, er
 //httpClass.Post
 func (t *HttpClass) Post(url string, body string, header map[string]string) (*HttpClassRet, error) {
 	req, _ := http.NewRequest("POST", url, strings.NewReader(body))
-	header = t.initHeader(header)
+	header = t.initHttpRequst(header)
 	for h_key, h_var := range header {
 		req.Header.Set(h_key, h_var)
 	}
+	t.HttpClient.Timeout = time.Second * 5
 	resp, err := t.HttpClient.Do(req)
 	if err != nil {
 		fmt.Println(err)
@@ -124,7 +150,7 @@ func (t *HttpClass) Post(url string, body string, header map[string]string) (*Ht
 }
 
 //初始化http请求header
-func (*HttpClass) initHeader(header map[string]string) map[string]string {
+func (t *HttpClass) initHttpRequst(header map[string]string) map[string]string {
 	if header["content-type"] == "" {
 		header["content-type"] = "application/x-www-form-urlencoded; charset=UTF-8"
 	}
@@ -132,11 +158,14 @@ func (*HttpClass) initHeader(header map[string]string) map[string]string {
 	if header["user-agent"] == "" {
 		header["user-agent"] = "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) AppleWebKit/534.16 (KHTML, like Gecko) Chrome/10.0.648.133 Safari/534.16"
 	}
+
+	t.HttpClient.Timeout = time.Second * 20
+
 	return header
 }
 
 //httpClass.AddCookie 合并2个Cookie
-func (*HttpClass) AddCookie(old string, new string) string {
+func (t *HttpClass) AddCookie(old string, new string) string {
 	cookie := map[string]string{}
 	old_arr := strings.Split(old, ";")
 	new_arr := strings.Split(new, ";")
