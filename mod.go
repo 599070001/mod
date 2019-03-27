@@ -41,6 +41,7 @@ type HttpClass struct {
 type HttpClassRet struct {
 	Body   string
 	Cookie string
+	Header http.Header
 }
 
 type TimerRet struct {
@@ -88,17 +89,15 @@ func (*StringsClass) BetweenStr(str, start, end string) string {
 	n := strings.Index(str, start)
 	if n == -1 {
 		n = 0
+	} else {
+		n = n + len(start)
 	}
 	str = string([]byte(str)[n:])
 	m := strings.Index(str, end)
 	if m == -1 {
 		m = len(str)
 	}
-	s := len(start)
-	if s > m {
-		s = m
-	}
-	str = string([]byte(str)[s:m])
+	str = string([]byte(str)[:m])
 	return str
 }
 
@@ -112,12 +111,12 @@ func (t *HttpClass) Get(url string, header map[string]string) (*HttpClassRet, er
 	resp, err := t.HttpClient.Do(req)
 	if err != nil {
 		fmt.Println(err)
-		return nil, err
+		return &HttpClassRet{}, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusFound {
 		fmt.Printf("Bad HTTP Response: %v", resp.Status)
-		return nil, fmt.Errorf("error http status code %v", resp.Status)
+		return &HttpClassRet{}, fmt.Errorf("error http status code %v", resp.Status)
 	}
 	//get Set-Cookie
 	session := resp.Cookies()
@@ -128,7 +127,7 @@ func (t *HttpClass) Get(url string, header map[string]string) (*HttpClassRet, er
 	session_str := strings.Join(session_arr, "; ")
 
 	ret, _ := ioutil.ReadAll(resp.Body)
-	return &HttpClassRet{string(ret), session_str}, nil
+	return &HttpClassRet{string(ret), session_str, resp.Header}, nil
 }
 
 //httpClass.Post
@@ -142,12 +141,12 @@ func (t *HttpClass) Post(url string, body string, header map[string]string) (*Ht
 	resp, err := t.HttpClient.Do(req)
 	if err != nil {
 		fmt.Println(err)
-		return nil, err
+		return &HttpClassRet{}, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusFound {
 		fmt.Printf("Bad HTTP Response: %v", resp.Status)
-		return nil, fmt.Errorf("error http status code %v", resp.Status)
+		return &HttpClassRet{}, fmt.Errorf("error http status code %v", resp.Status)
 	}
 
 	//get Set-Cookie
@@ -159,7 +158,7 @@ func (t *HttpClass) Post(url string, body string, header map[string]string) (*Ht
 	session_str := strings.Join(session_arr, "; ")
 
 	ret, _ := ioutil.ReadAll(resp.Body)
-	return &HttpClassRet{string(ret), session_str}, nil
+	return &HttpClassRet{string(ret), session_str, resp.Header}, nil
 }
 
 //初始化http请求header
@@ -173,7 +172,9 @@ func (t *HttpClass) initHttpRequst(header map[string]string) map[string]string {
 	}
 
 	t.HttpClient.Timeout = time.Second * 20
-
+	t.HttpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
 	return header
 }
 
