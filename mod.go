@@ -21,6 +21,10 @@ func NewStrings() *StringsClass {
 	return &StringsClass{}
 }
 
+//IO类操作
+type FileClass struct {
+}
+
 //时间类
 type TimeClass struct {
 }
@@ -41,6 +45,15 @@ type HttpClassRet struct {
 
 type TimerRet struct {
 	StopCannel chan interface{}
+}
+
+func (*FileClass) WriteString(path string, data string) {
+
+}
+
+func (*FileClass) ReadString(path string) string {
+
+	return ""
 }
 
 //获取随机16位小数 Math.random
