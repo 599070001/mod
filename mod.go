@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -201,4 +202,11 @@ func (t *HttpClass) AddCookie(old string, new string) string {
 		cookie_str = append(cookie_str, fmt.Sprintf("%s=%s", c_key, c_val))
 	}
 	return strings.Join(cookie_str, "; ")
+}
+
+func CheckError(e error) {
+	if e != nil {
+		fmt.Printf("【软件错误】%s", e.Error())
+		os.Exit(1)
+	}
 }
