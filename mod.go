@@ -85,6 +85,18 @@ func timerF(t *time.Ticker, closeChannel chan interface{}, f func()) {
 	}
 }
 
+//时间戳 10,13
+func (*TimeClass) TimeStamp(size int) string {
+	timestamp := ""
+	switch size {
+	case 13:
+		timestamp = strconv.FormatInt(time.Now().UnixNano()/1e6, 10)
+	case 10:
+		timestamp = strconv.FormatInt(time.Now().Unix(), 10)
+	}
+	return timestamp
+}
+
 //截取中间字符串
 func (*StringsClass) BetweenStr(str, start, end string) string {
 	n := strings.Index(str, start)
