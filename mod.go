@@ -222,3 +222,7 @@ func CheckError(e error) {
 		os.Exit(1)
 	}
 }
+
+func Info(o interface{}) {
+	fmt.Printf("%+v\n", o)
+}
