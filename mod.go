@@ -1,7 +1,9 @@
 package mod
 
 import (
+	"crypto/tls"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -22,6 +24,18 @@ func NewStrings() *StringsClass {
 	return &StringsClass{}
 }
 
+func NewFile() *FileClass {
+	return &FileClass{}
+}
+
+func NewGoroutinePool(wokerNum int) *GoroutinePool {
+	return &GoroutinePool{
+		workerNum:      wokerNum,
+		TaskChannel:    make(chan Task),
+		AddTaskChannel: make(chan Task),
+	}
+}
+
 //IO类操作
 type FileClass struct {
 }
@@ -39,6 +53,18 @@ type HttpClass struct {
 	HttpClient http.Client
 }
 
+type Task struct {
+	F func(map[string]string)
+	P map[string]string
+}
+
+//type GoroutinePool
+type GoroutinePool struct {
+	workerNum      int
+	TaskChannel    chan Task
+	AddTaskChannel chan Task
+}
+
 type HttpClassRet struct {
 	Body   string
 	Cookie string
@@ -49,13 +75,54 @@ type TimerRet struct {
 	StopCannel chan interface{}
 }
 
-func (*FileClass) WriteString(path string, data string) {
+func (t *Task) Exec() {
+	t.F(t.P)
+}
+
+func (pool *GoroutinePool) Run() {
+
+	for i := 0; i < pool.workerNum; i++ {
+		go pool.worker()
+	}
+
+	for task := range pool.AddTaskChannel {
+		pool.TaskChannel <- task
+	}
 
 }
 
-func (*FileClass) ReadString(path string) string {
+func (pool *GoroutinePool) worker() {
+	for task := range pool.TaskChannel {
+		task.Exec()
+	}
 
-	return ""
+}
+
+func (*FileClass) WriteString(path string, data string) error {
+	return ioutil.WriteFile(path, []byte(data), os.ModePerm)
+}
+
+func (*FileClass) ReadString(path string) (string, error) {
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), err
+}
+
+func (*FileClass) AppendString(path string, data string) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	n, err := f.Write([]byte(data))
+	if err == nil && n < len(data) {
+		err = io.ErrShortWrite
+	}
+	if err1 := f.Close(); err == nil {
+		err = err1
+	}
+	return err
 }
 
 //获取随机16位小数 Math.random
@@ -114,6 +181,68 @@ func (*StringsClass) BetweenStr(str, start, end string) string {
 	return str
 }
 
+//获取随机 Math.random
+func (*StringsClass) RandomInt(s, e int) string {
+	rand.Seed(time.Now().UnixNano())
+	return strconv.Itoa(rand.Intn(e-s) + s)
+}
+
+//字符串相似度
+func (*StringsClass) SimilarText(first, second string, percent *float64) int {
+	var similarText func(string, string, int, int) int
+	similarText = func(str1, str2 string, len1, len2 int) int {
+		var sum, max int
+		pos1, pos2 := 0, 0
+
+		// Find the longest segment of the same section in two strings
+		for i := 0; i < len1; i++ {
+			for j := 0; j < len2; j++ {
+				for l := 0; (i+l < len1) && (j+l < len2) && (str1[i+l] == str2[j+l]); l++ {
+					if l+1 > max {
+						max = l + 1
+						pos1 = i
+						pos2 = j
+					}
+				}
+			}
+		}
+
+		if sum = max; sum > 0 {
+			if pos1 > 0 && pos2 > 0 {
+				sum += similarText(str1, str2, pos1, pos2)
+			}
+			if (pos1+max < len1) && (pos2+max < len2) {
+				s1 := []byte(str1)
+				s2 := []byte(str2)
+				sum += similarText(string(s1[pos1+max:]), string(s2[pos2+max:]), len1-pos1-max, len2-pos2-max)
+			}
+		}
+
+		return sum
+	}
+
+	l1, l2 := len(first), len(second)
+	if l1+l2 == 0 {
+		return 0
+	}
+	sim := similarText(first, second, l1, l2)
+	if percent != nil {
+		*percent = float64(sim*200) / float64(l1+l2)
+	}
+	return sim
+}
+
+//关键词组过滤，检查是否存在
+func (*StringsClass) FitterKeyWords(input string, words []string) bool {
+
+	for _, value := range words {
+		if strings.Contains(input, value) {
+			return true
+		}
+	}
+	return false
+}
+
 //httpClass.Get
 func (t *HttpClass) Get(url string, header map[string]string) (*HttpClassRet, error) {
 	req, _ := http.NewRequest("GET", url, nil)
@@ -121,6 +250,7 @@ func (t *HttpClass) Get(url string, header map[string]string) (*HttpClassRet, er
 	for h_key, h_var := range header {
 		req.Header.Set(h_key, h_var)
 	}
+	//t.HttpClient.Timeout = time.Second * 15
 	resp, err := t.HttpClient.Do(req)
 	if err != nil {
 		fmt.Println(err)
@@ -150,7 +280,7 @@ func (t *HttpClass) Post(url string, body string, header map[string]string) (*Ht
 	for h_key, h_var := range header {
 		req.Header.Set(h_key, h_var)
 	}
-	t.HttpClient.Timeout = time.Second * 5
+	//t.HttpClient.Timeout = time.Second * 15
 	resp, err := t.HttpClient.Do(req)
 	if err != nil {
 		fmt.Println(err)
@@ -176,6 +306,9 @@ func (t *HttpClass) Post(url string, body string, header map[string]string) (*Ht
 
 //初始化http请求header
 func (t *HttpClass) initHttpRequst(header map[string]string) map[string]string {
+	if header == nil {
+		header = map[string]string{}
+	}
 	if header["content-type"] == "" {
 		header["content-type"] = "application/x-www-form-urlencoded; charset=UTF-8"
 	}
@@ -184,9 +317,13 @@ func (t *HttpClass) initHttpRequst(header map[string]string) map[string]string {
 		header["user-agent"] = "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) AppleWebKit/534.16 (KHTML, like Gecko) Chrome/10.0.648.133 Safari/534.16"
 	}
 
-	t.HttpClient.Timeout = time.Second * 20
+	t.HttpClient.Timeout = time.Second * 30
 	t.HttpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
+	}
+	//忽略https 证书验证
+	t.HttpClient.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	return header
 }
@@ -225,4 +362,12 @@ func CheckError(e error) {
 
 func Info(o interface{}) {
 	fmt.Printf("%+v\n", o)
+}
+
+func RunPath() string {
+	currentPath, ok := os.Getwd()
+	if ok != nil {
+		panic(ok)
+	}
+	return currentPath + "/"
 }
